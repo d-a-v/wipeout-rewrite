@@ -17,9 +17,12 @@
 #define WING_BRAKE_THRESHOLD                128 // max 256
 #define WING_SLIDE_ANGLE_SLOW_THRESHOLD     DEG_TO_ANGLE(10)
 #define WING_SLIDE_ANGLE_FAST_THRESHOLD     DEG_TO_ANGLE(20)
-#define WING_RECENTER_ANGLE                 DEG_TO_ANGLE(0.2f)
-#define WING_STRAIGHT_ENOUGH_ANGLE          DEG_TO_ANGLE(0.5f)
-#define WING_SLIDE_SMOOTHING                (0.9f)
+#define WING_RECENTER_ANGLE_PER_SEC         DEG_TO_ANGLE(5.f)
+#define SPEED_MAX                           40000
+
+//#define WING_RECENTER_ANGLE                 DEG_TO_ANGLE(0.2f)
+//#define WING_STRAIGHT_ENOUGH_ANGLE          DEG_TO_ANGLE(0.5f)
+//#define WING_SLIDE_SMOOTHING                (0.9f)
 
 #if !defined(M_SQRT2)
 	#define M_SQRT2 1.4142135623730951

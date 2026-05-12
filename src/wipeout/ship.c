@@ -655,14 +655,32 @@ void ship_resolve_wing_collision(ship_t *self, track_face_t *face, float directi
 	                      ((direction < 0 && self->brake_right >= WING_BRAKE_THRESHOLD) ||
 	                       (direction > 0 && self->brake_left >= WING_BRAKE_THRESHOLD)));
 
-	printf("Wing %s: ship2track=%f⁰ side=%d trackdir=%f shipdir=%f⁰\n",
+#ifndef NDEBUG
+	printf("Wing %s: 1/dt=%.2fHz speed=%.1f%% ship2track=%f⁰ side=%d trackdir=%f shipdir=%f⁰\n",
 	    is_wing_slide? "slide": "collision",
+	    1.0f/system_tick(),
+	    100.f * self->speed / SPEED_MAX,
 		ANGLE_TO_DEG(ship2track),
 		direction<0?-1:1,
 		ANGLE_TO_DEG(track_angle_y),
 		ANGLE_TO_DEG(self->angle.y));
+#endif
 
 	if (is_wing_slide) {
+
+#if 1
+
+        float speed_factor = self->speed / SPEED_MAX;
+    	self->angle.y += (direction<0? -WING_RECENTER_ANGLE_PER_SEC: WING_RECENTER_ANGLE_PER_SEC) * speed_factor * system_tick();
+
+        // scrape is declared as static in order to make stateful decisions
+		static sfx_t* scrape = NULL; // NULL = not playing
+		if (scrape && !flags_is(scrape->flags, SFX_PLAY))
+			scrape = NULL; // checked as not playing anymore -> NULL
+		if (!scrape) // if not playing -> play it
+			scrape = sfx_play_at(SFX_SCRAPE, ship_nose(self), vec3(0, 0, 0), 1.f);
+
+#else
 
 		if (abs_ship2track < WING_STRAIGHT_ENOUGH_ANGLE) {
 
@@ -685,6 +703,7 @@ void ship_resolve_wing_collision(ship_t *self, track_face_t *face, float directi
 			if (!scrape) // not playing -> play it
 				scrape = sfx_play_at(SFX_SCRAPE, ship_nose(self), vec3(0, 0, 0), 1.f);
 		}
+#endif
 
 		return;
 	}
