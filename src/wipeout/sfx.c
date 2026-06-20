@@ -309,7 +309,7 @@ void sfx_set_position(sfx_t *sfx, vec3_t pos, vec3_t vel, float volume) {
 	float distance = vec3_len(relative_position);
 
 	sfx->volume = clamp(scale(distance, 512, 32768, 1, 0), 0, 1) * volume;
-	sfx->pan = -sin(atan2(g.camera.position.x - pos.x, g.camera.position.z - pos.z)+g.camera.angle.y);
+	sfx->pan = -sinf(atan2(g.camera.position.x - pos.x, g.camera.position.z - pos.z)+g.camera.angle.y);
 
 	// Doppler effect
 	float away = vec3_dot(relative_velocity, relative_position) / distance;
@@ -450,7 +450,7 @@ void sfx_stero_mix(float *buffer, uint32_t len) {
 			sfx->position += sfx->pitch;
 			if (sfx->position >= source_len) {
 				if (flags_is(sfx->flags, SFX_LOOP)) {
-					sfx->position = fmod(sfx->position, source_len);
+					sfx->position = fmodf(sfx->position, source_len);
 				}
 				else {
 					flags_rm(sfx->flags, SFX_PLAY);
