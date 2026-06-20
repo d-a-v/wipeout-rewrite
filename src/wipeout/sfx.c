@@ -442,15 +442,14 @@ void sfx_stero_mix(float *buffer, uint32_t len) {
 
 			sfx_data_t *source = &sources[sfx->source];
 			float sample = (float)source->samples[(int)sfx->position] / 32768.0;
-			uint32_t source_len = source->len;
 
 			left += sample * sfx->current_volume * clamp(1.0 - sfx->current_pan, 0, 1);
 			right += sample * sfx->current_volume * clamp(1.0 + sfx->current_pan, 0, 1);
 
 			sfx->position += sfx->pitch;
-			if (sfx->position >= source_len) {
+			if (sfx->position >= source->len) {
 				if (flags_is(sfx->flags, SFX_LOOP)) {
-					sfx->position = fmodf(sfx->position, source_len);
+					sfx->position = fmodf(sfx->position, source->len);
 				}
 				else {
 					flags_rm(sfx->flags, SFX_PLAY);
