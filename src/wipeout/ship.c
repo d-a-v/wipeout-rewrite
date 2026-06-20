@@ -217,6 +217,7 @@ void ship_init(ship_t *self, section_t *section, int pilot, int inv_start_rank) 
 
 	self->update_timer = 0;
 	self->last_impact_time = 0;
+	self->sfx_scrape = NULL;
 
 	int team = def.pilots[pilot].team;
 	self->mass =          def.teams[team].attributes[g.race_class].mass;
@@ -634,8 +635,6 @@ static bool vec3_is_on_face(vec3_t pos, track_face_t *face, float alpha) {
 	return (angle > (0.91552734375 * M_PI * 2));
 }
 
-#define SHOW_COLLISION
-
 void ship_resolve_wing_collision(ship_t *self, track_face_t *face, float direction) {
 
 	// track direction (tangent) from section
@@ -657,10 +656,6 @@ void ship_resolve_wing_collision(ship_t *self, track_face_t *face, float directi
 
 	if (is_wing_slide) {
 
-#ifdef SHOW_COLLISION
-		printf("Wing slide\n");
-#endif
-
 		// slide factor:
 		// good brake -> 1
 		// no break -> .5
@@ -671,23 +666,19 @@ void ship_resolve_wing_collision(ship_t *self, track_face_t *face, float directi
 		const float perpendicular = vec3_dot(self->velocity, face->normal);
 		self->velocity = vec3_sub(self->velocity, vec3_mulf(face->normal, perpendicular));
 
-		// apply slide factor to tangencial velocity (system_tick=~1/60)
+		// apply slide factor to tangential velocity (system_tick=~1/60)
 		self->velocity = vec3_mulf(self->velocity, 1.0f - ((1.0f - slide_factor) * system_tick()));
 
-		// scrape sound:
-		// scrape is declared as static in order to make stateful decisions
-		static sfx_t* scrape = NULL; // NULL = not playing
-		if (scrape && !flags_is(scrape->flags, SFX_PLAY))
-			scrape = NULL; // checked as not playing anymore -> NULL
-		if (!scrape) // if not playing -> play it
-			scrape = sfx_play_at(SFX_SCRAPE, ship_nose(self), vec3(0, 0, 0), 1.f);
+		// scrape sound: use per-ship field to track playback state
+		if (self->sfx_scrape && !flags_is(self->sfx_scrape->flags, SFX_PLAY)) {
+			self->sfx_scrape = NULL;
+		}
+		if (!self->sfx_scrape) {
+			self->sfx_scrape = sfx_play_at(SFX_SCRAPE, ship_nose(self), vec3(0, 0, 0), 1.0f);
+		}
 
 		return;
 	}
-
-#ifdef SHOW_COLLISION
-	printf("Wing collision\n");
-#endif
 
 	vec3_t collision_vector = vec3_sub(self->section->center, face->tris[0].vertices[2].pos);
 	float angle = vec3_angle(collision_vector, self->dir_forward);
@@ -716,9 +707,6 @@ void ship_resolve_wing_collision(ship_t *self, track_face_t *face, float directi
 
 
 void ship_resolve_nose_collision(ship_t *self, track_face_t *face, float direction) {
-#ifdef SHOW_COLLISION
-	printf("Nose collision\n");
-#endif
 	vec3_t collision_vector = vec3_sub(self->section->center, face->tris[0].vertices[2].pos);
 	float angle = vec3_angle(collision_vector, self->dir_forward);
 	self->velocity = vec3_reflect(self->velocity, face->normal, 2);
