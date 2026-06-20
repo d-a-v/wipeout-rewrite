@@ -49,6 +49,7 @@ extern int sbs; // side by side -1:left 0:no-sbs +1:right
 
 #define len(A) (sizeof(A) / sizeof(A[0]))
 #define clear(A) memset(A, 0, sizeof(A))
+#define round_up_to_word(A) (((A + 7) >> 3) << 3)
 
 
 #define STRINGIFY(x) #x
