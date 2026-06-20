@@ -634,79 +634,60 @@ static bool vec3_is_on_face(vec3_t pos, track_face_t *face, float alpha) {
 	return (angle > (0.91552734375 * M_PI * 2));
 }
 
+#define SHOW_COLLISION
+
 void ship_resolve_wing_collision(ship_t *self, track_face_t *face, float direction) {
 
 	// track direction (tangent) from section
-	vec3_t track_vec = vec3_normalize(vec3_sub(self->section->next->center, self->section->center));
-	float track_angle_y = -atan2(track_vec.x, track_vec.z);
+	const vec3_t track_vec = vec3_normalize(vec3_sub(self->section->next->center, self->section->center));
+	const float track_angle_y = -atan2(track_vec.x, track_vec.z);
 
 	// angle between ship direction and track direction
 	float ship2track = track_angle_y - self->angle.y;
-	float abs_ship2track = fabsf(ship2track);
+	while (ship2track < -180) ship2track += 360;
+	while (ship2track > 180) ship2track -= 360;
 
-	// on left side: direction < 0
-	// on right side: direction > 0
+	const bool on_left = direction < 0;
+	if (on_left)
+	    ship2track = -ship2track;
+	// ship2track > 0 when heading to wall
 
 	// detect wing sliding:
-	// - when little angle
-	// - when bigger angle and trying to avoid using break L/R resp on right/left side
-	bool is_wing_slide = (abs_ship2track < WING_SLIDE_ANGLE_SLOW_THRESHOLD) ||
-	                     (abs_ship2track < WING_SLIDE_ANGLE_FAST_THRESHOLD &&
-	                      ((direction < 0 && self->brake_right >= WING_BRAKE_THRESHOLD) ||
-	                       (direction > 0 && self->brake_left >= WING_BRAKE_THRESHOLD)));
-
-#ifndef NDEBUG
-	printf("Wing %s: 1/dt=%.2fHz speed=%.1f%% ship2track=%f⁰ side=%d trackdir=%f shipdir=%f⁰\n",
-	    is_wing_slide? "slide": "collision",
-	    1.0f/system_tick(),
-	    100.f * self->speed / SPEED_MAX,
-		ANGLE_TO_DEG(ship2track),
-		direction<0?-1:1,
-		ANGLE_TO_DEG(track_angle_y),
-		ANGLE_TO_DEG(self->angle.y));
-#endif
+	const bool is_wing_slide = ship2track < 0;
 
 	if (is_wing_slide) {
 
-#if 1
+#ifdef SHOW_COLLISION
+		printf("Wing slide\n");
+#endif
 
-        float speed_factor = self->speed / SPEED_MAX;
-    	self->angle.y += (direction<0? -WING_RECENTER_ANGLE_PER_SEC: WING_RECENTER_ANGLE_PER_SEC) * speed_factor * system_tick();
+		// slide factor:
+		// good brake -> 1
+		// no break -> .5
+		// bad brake -> 0
+		const float slide_factor = (((on_left? 1: -1) * (self->brake_right - self->brake_left)) + 256) / 512.0;
 
-        // scrape is declared as static in order to make stateful decisions
+		// cancel perpendicular velocity
+		const float perpendicular = vec3_dot(self->velocity, face->normal);
+		self->velocity = vec3_sub(self->velocity, vec3_mulf(face->normal, perpendicular));
+
+		// apply slide factor to tangencial velocity (system_tick=~1/60)
+		self->velocity = vec3_mulf(self->velocity, 1.0f - ((1.0f - slide_factor) * system_tick()));
+
+		// scrape sound:
+		// scrape is declared as static in order to make stateful decisions
 		static sfx_t* scrape = NULL; // NULL = not playing
 		if (scrape && !flags_is(scrape->flags, SFX_PLAY))
 			scrape = NULL; // checked as not playing anymore -> NULL
 		if (!scrape) // if not playing -> play it
 			scrape = sfx_play_at(SFX_SCRAPE, ship_nose(self), vec3(0, 0, 0), 1.f);
 
-#else
-
-		if (abs_ship2track < WING_STRAIGHT_ENOUGH_ANGLE) {
-
-			// ship is along the track, slightly push it inward
-
-			self->angle.y += direction<0? -WING_RECENTER_ANGLE: WING_RECENTER_ANGLE;
-
-		} else if ((direction < 0 /*on left side*/ && ship2track < 0 /* going left */) ||
-		           (direction > 0 /*on right side*/ && ship2track > 0 /* going right */)) {
-
-			// ship is going outside from the track
-			// smoothly pull ship to the track direction
-			// and make noise
-
-			self->angle.y = (self->angle.y * WING_SLIDE_SMOOTHING) + (track_angle_y * (1.0f - WING_SLIDE_SMOOTHING));
-
-			static sfx_t* scrape = NULL; // NULL = not playing
-			if (scrape && !flags_is(scrape->flags, SFX_PLAY))
-				scrape = NULL; // checked as not playing anymore -> NULL
-			if (!scrape) // not playing -> play it
-				scrape = sfx_play_at(SFX_SCRAPE, ship_nose(self), vec3(0, 0, 0), 1.f);
-		}
-#endif
-
 		return;
 	}
+
+#ifdef SHOW_COLLISION
+	printf("Wing collision\n");
+#endif
 
 	vec3_t collision_vector = vec3_sub(self->section->center, face->tris[0].vertices[2].pos);
 	float angle = vec3_angle(collision_vector, self->dir_forward);
@@ -735,6 +716,9 @@ void ship_resolve_wing_collision(ship_t *self, track_face_t *face, float directi
 
 
 void ship_resolve_nose_collision(ship_t *self, track_face_t *face, float direction) {
+#ifdef SHOW_COLLISION
+	printf("Nose collision\n");
+#endif
 	vec3_t collision_vector = vec3_sub(self->section->center, face->tris[0].vertices[2].pos);
 	float angle = vec3_angle(collision_vector, self->dir_forward);
 	self->velocity = vec3_reflect(self->velocity, face->normal, 2);
