@@ -611,23 +611,22 @@ void ship_resolve_wing_collision(ship_t *self, track_face_t *face, float directi
 
 	// angle between ship direction and track direction
 	float ship2track = track_angle_y - self->angle.y;
-	while (ship2track < -180) ship2track += 360;
-	while (ship2track > 180) ship2track -= 360;
+	if (ship2track < -M_PI) ship2track += 2*M_PI;
+	if (ship2track > M_PI) ship2track -= 2*M_PI;
 
 	const bool on_left = direction < 0;
 	if (on_left)
 	    ship2track = -ship2track;
 	// ship2track > 0 when heading to wall
+	const bool is_sliding = ship2track < 0;
 
-	// detect wing sliding:
-	const bool is_wing_slide = ship2track < 0;
-
-	if (is_wing_slide) {
+	if (is_sliding) {
 
 		// slide factor:
 		// good brake -> 1
 		// no break -> .5
 		// bad brake -> 0
+		// brake_left/right in [0..256]
 		const float slide_factor = (((on_left? 1: -1) * (self->brake_right - self->brake_left)) + 256) / 512.0;
 
 		// cancel perpendicular velocity
